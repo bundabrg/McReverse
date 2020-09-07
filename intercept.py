@@ -1,0 +1,4 @@
+import frida, sys
+
+jscode = """
+"""
