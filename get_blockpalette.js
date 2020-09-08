@@ -132,6 +132,13 @@ var CompoundTag = {
     }
 }
 
+var Block = {
+    getLegacyId: function(block) {
+        // Return the Block->BlockLegacy::legacyId
+        return block.add(8).readPointer().readPointer().add(0xd4).readU16();
+    }
+}
+
 
 // Hook Block Palette assigning the runtime ID's and export the palette
 Interceptor.attach(ptr_block_palette__assign_block_runtime_ids, {
@@ -148,6 +155,14 @@ Interceptor.attach(ptr_block_palette__assign_block_runtime_ids, {
         while(!block.equals(last)) {
             var compoundTag = block.readPointer().add(0x0c);
             CompoundTag.serialize(buf, compoundTag);
+
+            // Ugly hack. We remove the END tag and add an ID for the legacy ID, then add it back
+            buf.pop();
+            DataOutput.writeByte(buf, 0x3);
+            DataOutput.writeUTF(buf, "id");
+            DataOutput.writeInt(buf, Block.getLegacyId(block.readPointer()));
+            DataOutput.writeByte(buf, 0);
+
             block = block.add(0x4);
             count+=1;
         }
