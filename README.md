@@ -9,7 +9,7 @@ Retrieve a block palette from a Bedrock Client. Presently only tested against a 
 and makes use of Frida to provide the hooking.
 
 ### Quick Start
-1. Install requirements. `pip install -r requirements.txt`. Ideally in a virtualenv.
+1. Install requirements. `pip install -r requirements.txt`. Ideally in a virtualenv. Python3 of course.
 1. `adb push` a copy of [frida_server](https://github.com/frida/frida/releases) to your device. You may need to
 put it in /sdcard
 1. `adb shell` in, su to root and copy it to an executable patition. I use /data. IE. `copy /sdcard/frida_server64 /data`. Don't
