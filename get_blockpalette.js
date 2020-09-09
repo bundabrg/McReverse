@@ -154,13 +154,18 @@ Interceptor.attach(ptr_block_palette__assign_block_runtime_ids, {
         var count = 0;
         while(!block.equals(last)) {
             var compoundTag = block.readPointer().add(0x0c);
+
+            // Store it inside a "block" compound tag
+            DataOutput.writeByte(buf, 0xa);
+            DataOutput.writeUTF(buf, "block");
+
             CompoundTag.serialize(buf, compoundTag);
 
-            // Ugly hack. We remove the END tag and add an ID for the legacy ID, then add it back
-            buf.pop();
+            // Add Legacy ID
             DataOutput.writeByte(buf, 0x3);
             DataOutput.writeUTF(buf, "id");
             DataOutput.writeInt(buf, Block.getLegacyId(block.readPointer()));
+
             DataOutput.writeByte(buf, 0);
 
             block = block.add(0x4);
