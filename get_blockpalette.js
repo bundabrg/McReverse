@@ -147,8 +147,9 @@ Interceptor.attach(ptr_block_palette__assign_block_runtime_ids, {
 
 
         var palette = args[0];
-        var block = palette.add(0x8*5).readPointer();
-        var last = palette.add(0x8*5).add(0x4).readPointer();
+
+        var block = palette.add(0x8*4).sub(0x4).readPointer();
+        var last = palette.add(0x8*4).readPointer();
         var buf = [];
 
         var count = 0;
