@@ -3,8 +3,10 @@ import sys
 import frida
 
 # Attach to Session Server using USB
+process = None
 try:
-    process = frida.get_usb_device().attach("com.mojang.minecraftpe")
+    # process = frida.attach(int(sys.argv[1]))
+    process = frida.get_usb_device().attach("Minecraft")
 except frida.InvalidArgumentError as e:
     print("Unable to find frida instance on USB device. Make sure you are connected to your device with")
     print("a USB cable and running fridaserver or fridaserver64 on the device using adb")
@@ -17,8 +19,8 @@ except frida.ProcessNotFoundError as e:
 
 def onMessage(message, data):
     if message['type'] == 'send':
-        out = open("blockpalette.nbt", "wb")
-        out.write(bytes(message['payload']));
+        with open("blockpalette.nbt", "wb") as out:
+            out.write(bytes(message['payload']));
 
         print("Saved to: blockpalette.nbt");
 
@@ -30,5 +32,4 @@ script = process.create_script(open("get_blockpalette.js").read())
 
 script.on('message', onMessage)
 script.load()
-
 sys.stdin.read()
