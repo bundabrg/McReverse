@@ -2,19 +2,21 @@ import sys
 
 import frida
 
+# We assume that frida-server is run on a remote machine with parameter '-l remotes_own_ip' and will attach
+# to it from where this is run. This is mainly because I run linux and the app runs in windows only.
+
+# Parameters
+remote_ip = sys.argv[1]
+
 # Attach to Session Server using USB
 process = None
 try:
-    # process = frida.attach(int(sys.argv[1]))
-    process = frida.get_usb_device().attach("Minecraft")
-except frida.InvalidArgumentError as e:
-    print("Unable to find frida instance on USB device. Make sure you are connected to your device with")
-    print("a USB cable and running fridaserver or fridaserver64 on the device using adb")
-    exit(0)
+    device = frida.get_device_manager().add_remote_device(remote_ip)
+
+    process = device.attach("Minecraft.Windows.exe")
 except frida.ProcessNotFoundError as e:
-    print("Process not found. Attempting to start")
-    pid = frida.get_usb_device().spawn("com.mojang.minecraftpe")
-    process = frida.get_usb_device().attach(pid)
+    print("Process not found.")
+    exit(0)
 
 
 def onMessage(message, data):

@@ -1,0 +1,20 @@
+NOTE this is not a complete guide but will contain helpful notes as easier ways are worked out how to figure out stuff. However
+ultimately you will be required to decompile and just look at the code to figure stuff out because every compiler is
+different enough to make one solution not work.
+
+
+
+Looking for the offsets:
+
+* Decompile libminecraftpe.so or Mincraft.Windows.exe using ghidra
+
+* Search memory for string "BlockRuntimeId" which is found inside BlockPalette::getBlock(*this, runtimeId). Nice thing about this function is
+it is called often ingame especially if you just leave yourself mounted on a pig.
+
+* Grab the address of the function amd sub the Image base (under Windows->Memory Map)
+
+BlockPalette
+  * Offset block start and end can be found inside getBlock. First if checks if the palette is empty, then checks if runtimeId parameter
+  is within the range of block_start to block_end
+
+

@@ -1,22 +1,23 @@
-let ptr_block_palette__get_block = Module.getBaseAddress("libminecraftpe.so").add(0x053db67c).sub(0x00100000);
+// BlockPalette::getBlock(this, runtimeId)
+let ptr_block_palette__get_block = Module.getBaseAddress("Minecraft.Windows.exe").add(0x013423f0).sub(0x00400000);
 
 var DataOutput = {
     MSB: 0x80,
     REST: 0x7F,
     MSBALL: ~0x7F,
     INT: Math.pow(2, 31),
-    writeByte: function(buf, data) {
+    writeByte: function (buf, data) {
         buf.push(data);
     },
-    writeVarInt: function(buf, num) {
+    writeVarInt: function (buf, num) {
         offset = 0
         var oldOffset = offset
 
-        while(num >= INT) {
+        while (num >= INT) {
             buf[offset++] = (num & 0xFF) | MSB
             num /= 128
         }
-        while(num & MSBALL) {
+        while (num & MSBALL) {
             buf[offset++] = (num & 0xFF) | MSB
             num >>>= 7
         }
@@ -40,6 +41,9 @@ var DataOutput = {
     },
 }
 
+/*
+    std::string format
+ */
 function readStdString(ptr) {
     const isTiny = (ptr.readU8() & 1) === 0;
     if (isTiny) {
@@ -49,36 +53,28 @@ function readStdString(ptr) {
     return ptr.add(2 * Process.pointerSize).readPointer().readUtf8String();
 }
 
-
-class Block {
-    OFFSET_COMPOUND_TAG = 0x78;
-    OFFSET_RUNTIME_ID = 0xa0;
-
-    constructor(ptr) {
-        this.ptr = ptr;
+/*
+  I don't really know what this structure is but found in Windows PE build of Education for strings
+  Structure is:
+    16 bytes: Data  - Could be a CString or a pointer to a CString
+    4 bytes: Length - Length of String
+    1 byte: Type  - 0xf if data is a cstring, 0x1f if its a pointer to a cstring
+ */
+function readWindowsString(ptr) {
+    const isTiny = ptr.add(0x14).readU8() === 0xf;
+    if (isTiny) {
+        return ptr.readUtf8String();
     }
 
-    getCompoundTag() {
-        return new CompoundTag(this.ptr.add(this.OFFSET_COMPOUND_TAG));
-    }
-
-    getRuntimeId() {
-        return this.ptr.add(this.OFFSET_RUNTIME_ID).readU16();
-    }
-
-    getName() {
-        return readStdString(this.getCompoundTag().getFirstChild().getData());
-    }
-
-    // getLegacyId: function(block) {
-    //     // Return the Block->BlockLegacy::legacyId
-    //     return block.add(8).readPointer().readPointer().add(0xd4).readU16();
-    // }
+    return ptr.readPointer().readUtf8String();
 }
 
+
 class BlockPalette {
-    OFFSET_FIRST_BLOCK = 0x58;
-    OFFSET_LAST_BLOCK = 0x60;
+    OFFSET_FIRST_BLOCK = 0x40;
+    OFFSET_LAST_BLOCK = 0x44;
+
+    PTR_SIZE = 0x4;
 
     constructor(ptr) {
         this.ptr = ptr;
@@ -92,28 +88,51 @@ class BlockPalette {
         return this.ptr.add(this.OFFSET_LAST_BLOCK).readPointer();
     }
 
+    getNextBlock(current_block_ptr) {
+        return current_block_ptr.add(this.PTR_SIZE);
+    }
+
 }
 
-class CompoundTag {
-    OFFSET_DATA = 0x8;
-    OFFSET_DATA_END = 0x10;
-    OFFSET_NAME = 0x20;
-    OFFSET_CHILD = 0x38;
-
-    OFFSET_FN_GETID = 0x8 * 6;
+class Block {
+    OFFSET_COMPOUND_TAG = 0x38;
+    OFFSET_RUNTIME_ID = 0x44;
 
     constructor(ptr) {
         this.ptr = ptr;
     }
 
-    getFirstChild() {
-        return new CompoundTag(this.getData().readPointer().add(this.OFFSET_CHILD));
+    getCompoundTag() {
+        return new CompoundTag(this.ptr.add(this.OFFSET_COMPOUND_TAG));
     }
 
-    getData() {
-        return this.ptr.add(this.OFFSET_DATA);
+    getRuntimeId() {
+        return this.ptr.add(this.OFFSET_RUNTIME_ID).readU16();
     }
 
+    // Honestly too hard right now and not needed
+    // getName() {
+    //     return readStdString(this.getCompoundTag().getFirstChild().getData());
+    // }
+
+    // Do we need legacyId anymore?
+    // getLegacyId: function(block) {
+    //     // Return the Block->BlockLegacy::legacyId
+    //     return block.add(8).readPointer().readPointer().add(0xd4).readU16();
+    // }
+}
+
+
+class CompoundTag {
+    OFFSET_DATA = 0x24;
+    OFFSET_NAME = 0x10;
+    OFFSET_CHILD = 0x28;
+
+    OFFSET_FN_GETID = 0x4 * 5;
+
+    constructor(ptr) {
+        this.ptr = ptr;
+    }
 
     // Serialize Tag into buf
     serialize(buf) {
@@ -122,36 +141,46 @@ class CompoundTag {
 
         switch (id) {
             case 0x1: // BYTE
-                DataOutput.writeByte(buf, this.ptr.add(this.OFFSET_DATA).readU8());
+                DataOutput.writeByte(buf, this.ptr.add(0x4).readU8());
+                // console.log("Byte: " + this.ptr.add(0x4).readU8());
                 break;
             case 0x3: // INTEGER
-                DataOutput.writeInt(buf, this.ptr.add(this.OFFSET_DATA).readInt());
+                DataOutput.writeInt(buf, this.ptr.add(0x4).readInt());
+                // console.log("Int: " + this.ptr.add(0x4).readInt());
                 break;
             case 0x8: // STRING
-                DataOutput.writeUTF(buf, readStdString(this.ptr.add(this.OFFSET_DATA)));
+                DataOutput.writeUTF(buf, readWindowsString(this.ptr.add(0x4)));
+                // console.log("String: " + readWindowsString(this.ptr.add(0x4)));
                 break;
 
             case 0xa: // COMPOUND_TAG
-                let current = this.ptr.add(this.OFFSET_DATA).readPointer();
-                let last = this.ptr.add(this.OFFSET_DATA_END);
+                // These are stored in a Binary Tree for Education
+                let self = this;
 
-                if (!current.equals(last)) {
-                    while (true) {
-                        let name = readStdString(current.add(this.OFFSET_NAME));
-                        let child = new CompoundTag(current.add(this.OFFSET_CHILD));
-
-                        DataOutput.writeByte(buf, child.getId());
-                        DataOutput.writeUTF(buf, name);
-                        child.serialize(buf);
-
-                        if (current.equals(last.readPointer())) {
-                            break;
-                        }
-
-                        current = current.add(0x10).readPointer();
-
-                    }
+            function processChild(ptr) {
+                // End of line?
+                if (ptr.add(0xd).readU8() === 1) {
+                    return;
                 }
+
+                // Left Branch
+                processChild(ptr.readPointer());
+
+                // Ourself
+                let name = readWindowsString(ptr.add(self.OFFSET_NAME));
+                let child = new CompoundTag(ptr.add(self.OFFSET_CHILD));
+                DataOutput.writeByte(buf, child.getId());
+                DataOutput.writeUTF(buf, name);
+                child.serialize(buf);
+
+                // Right Branch
+                processChild(ptr.add(0x8).readPointer());
+            }
+
+
+                let root = this.ptr.add(0x4).readPointer();
+                processChild(root.add(0x4).readPointer());
+
                 DataOutput.writeByte(buf, 0);
                 break;
             default:
@@ -169,13 +198,10 @@ class CompoundTag {
 // Hook a function that we can access the block palette memory from
 let interceptor = Interceptor.attach(ptr_block_palette__get_block, {
     onEnter: function (args) {
-        this.palette = args[0];
-    },
-    onLeave: function (args) {
+        let palette = new BlockPalette(this.context.ecx); // Its a __fastcall so *this is in ecx
+
         console.log("Found a generated BlockPalette. Please wait.");
         interceptor.detach();
-
-        let palette = new BlockPalette(this.palette);
 
         let current_block_addr = palette.getFirstBlockAddress();
         let last_block_addr = palette.getLastBlockAddress();
@@ -185,12 +211,9 @@ let interceptor = Interceptor.attach(ptr_block_palette__get_block, {
         while (!current_block_addr.equals(last_block_addr)) {
             let block = new Block(current_block_addr.readPointer());
 
-            console.log("Name: " + block.getName());
             // Store it inside a "block" compound tag
             DataOutput.writeByte(buf, 0xa);
             DataOutput.writeUTF(buf, "block");
-
-            // console.log("Found " + block.getName() + " with id " + block.getRuntimeId());
 
             block.getCompoundTag().serialize(buf);
 
@@ -200,8 +223,8 @@ let interceptor = Interceptor.attach(ptr_block_palette__get_block, {
             // DataOutput.writeInt(buf, Block.getLegacyId(block.readPointer()));
 
             DataOutput.writeByte(buf, 0);
+            current_block_addr = palette.getNextBlock(current_block_addr);
 
-            current_block_addr = current_block_addr.add(0x8);
             count += 1;
         }
         console.log("Found " + count + " blocks in Palette");
@@ -221,4 +244,4 @@ let interceptor = Interceptor.attach(ptr_block_palette__get_block, {
 });
 
 
-console.log("Hooked into process. Please start a new single player game.");
+console.log("Hooked into process.");
