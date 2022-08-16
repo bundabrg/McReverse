@@ -19,10 +19,19 @@ except frida.ProcessNotFoundError as e:
 
 def onMessage(message, data):
     if message['type'] == 'send':
-        with open("blockpalette.nbt", "wb") as out:
-            out.write(bytes(message['payload']));
+        new_message = []
+        for i in message['payload']:
+            i = int(i)
+            if i < 0:
+                new_message.append(i.to_bytes(1, byteorder='big', signed=True))
+            else:
+                new_message.append(i.to_bytes(1, byteorder='big', signed=False))
 
-        print("Saved to: blockpalette.nbt");
+        with open("blockpalette.nbt", "wb") as out:
+            for i in new_message:
+                out.write(i)
+
+        print("Saved to: blockpalette.nbt")
 
         process.detach()
         exit(0)

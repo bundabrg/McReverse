@@ -49,6 +49,28 @@ function readStdString(ptr) {
     return ptr.add(2 * Process.pointerSize).readPointer().readUtf8String();
 }
 
+function fnvHash(input) {
+	let hash = BigInt("0xcbf29ce484222325");
+
+	for(let i = 0; i < input.length; i++){
+		hash *= BigInt("0x100000001b3");
+        hash ^= BigInt(input.charCodeAt(i));
+        hash &= BigInt("0xFFFFFFFFFFFFFFFF");
+	}
+
+	return bigIntToIntArray(BigInt.asIntN(62, hash));
+}
+
+function bigIntToIntArray(bigInt) {
+    bigInt = BigInt(bigInt);
+    let lowInt = Math.floor(Number(bigInt / BigInt(2 ** 32)));
+    if (bigInt < 0) {
+        lowInt -= 1
+    }
+    let highInt = Number(bigInt - BigInt(lowInt) * BigInt(2 ** 32));
+    return [lowInt, highInt];
+}
+
 
 class Block {
     OFFSET_COMPOUND_TAG = 0x78;
@@ -187,19 +209,23 @@ let interceptor = Interceptor.attach(ptr_block_palette__get_block, {
 
             console.log("Name: " + block.getName());
             // Store it inside a "block" compound tag
-            DataOutput.writeByte(buf, 0xa);
-            DataOutput.writeUTF(buf, "block");
 
             // console.log("Found " + block.getName() + " with id " + block.getRuntimeId());
 
+            let hash = fnvHash(block.getName());
+            DataOutput.writeByte(buf, 0x4);
+            DataOutput.writeUTF(buf, "name_hash");
+            DataOutput.writeInt(buf, hash[0]);
+            DataOutput.writeInt(buf, hash[1]);
+            DataOutput.writeByte(buf, 0x3);
+            DataOutput.writeUTF(buf, "version");
+            DataOutput.writeInt(buf, 17959425);
             block.getCompoundTag().serialize(buf);
 
             // Add Legacy ID - Probably not needed anymore
             // DataOutput.writeByte(buf, 0x3);
             // DataOutput.writeUTF(buf, "id");
             // DataOutput.writeInt(buf, Block.getLegacyId(block.readPointer()));
-
-            DataOutput.writeByte(buf, 0);
 
             current_block_addr = current_block_addr.add(0x8);
             count += 1;
