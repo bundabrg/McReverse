@@ -21,11 +21,7 @@ def onMessage(message, data):
     if message['type'] == 'send':
         new_message = []
         for i in message['payload']:
-            i = int(i)
-            if i < 0:
-                new_message.append(i.to_bytes(1, byteorder='big', signed=True))
-            else:
-                new_message.append(i.to_bytes(1, byteorder='big', signed=False))
+            new_message.append(i.to_bytes(1, byteorder='big', signed=i < 0))
 
         with open("blockpalette.nbt", "wb") as out:
             for i in new_message:
