@@ -1,4 +1,4 @@
-let ptr_block_palette__get_block = Module.getBaseAddress("libminecraftpe.so").add(0x053a3d0c).sub(0x00100000);
+let ptr_block_palette__get_block = Module.getBaseAddress("libminecraftpe.so").add(0x054523e0).sub(0x00100000);
 
 var DataOutput = {
     MSB: 0x80,
