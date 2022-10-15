@@ -1,4 +1,4 @@
-let ptr_block_palette__get_block = Module.getBaseAddress("libminecraftpe.so").add(0x053ff07c).sub(0x00100000);
+let ptr_block_palette__get_block = Module.getBaseAddress("libminecraftpe.so").add(0x053527bc).sub(0x00100000);
 
 var DataOutput = {
     MSB: 0x80,
@@ -73,8 +73,8 @@ function bigIntToIntArray(bigInt) {
 
 
 class Block {
-    OFFSET_COMPOUND_TAG = 0x78;
-    OFFSET_RUNTIME_ID = 0xa0;
+    OFFSET_COMPOUND_TAG = 0x80;
+    OFFSET_RUNTIME_ID = 0xa8;
 
     constructor(ptr) {
         this.ptr = ptr;
